@@ -82,7 +82,7 @@ export class Tile extends Model {
     )
   }
 
-  static async inRange(topLeft, bottomRight) {
+  static async findFrom(timestamp) {
     const columnNames = this.filterColumnNames([
       'district_id',
       'asset_type'
@@ -91,14 +91,14 @@ export class Tile extends Model {
     return this.db.query(SQL`
       SELECT ${raw(columnNames)}
         FROM ${raw(this.tableName)}
-        WHERE ${ParcelQueries.whereIsBetweenCoordinates(topLeft, bottomRight)}`)
+        WHERE updated_at >= ${timestamp}`)
   }
 
   /**
    * Returns the tiles changing the type according to the supplied address.
    * For example if the address has a tile is on sale the db type will be TYPES.taken but will be chaged to TYPES.myParcelsOnSale here
    */
-  static async getForOwner(owner) {
+  static async getForOwner(owner, from) {
     const districtColumnNames = this.filterColumnNames(
       ['price', 'owner', 'estate_id', 'district_id', 'asset_type'],
       't'
@@ -108,6 +108,8 @@ export class Tile extends Model {
       't'
     ).join(', ')
 
+    const whereUpdatedAt = from ? SQL`t.updated_at >= ${from}` : SQL`1 = 1`
+
     const [districtTiles, ownerTiles] = await Promise.all([
       // prettier-ignore
       this.db.query(SQL`
@@ -116,11 +118,13 @@ export class Tile extends Model {
           JOIN ${raw(Contribution.tableName)} c ON c.address = ${owner} AND c.district_id = t.district_id
           WHERE (t.owner != ${owner} OR t.owner IS NULL)
             AND t.district_id IS NOT NULL
+            AND ${whereUpdatedAt}
           GROUP BY c.id, ${raw(districtColumnNames)}`),
       this.db.query(SQL`
         SELECT ${raw(ownerColumnNames)}
           FROM ${raw(this.tableName)} t
-          WHERE owner = ${owner}`)
+          WHERE owner = ${owner}
+            AND ${whereUpdatedAt}`)
     ])
 
     for (const tile of districtTiles) {
