@@ -1,10 +1,10 @@
 import { Model } from 'decentraland-commons'
 
 import { TileAttributes } from './TileAttributes'
-import { Asset, Parcel, Estate, ParcelQueries } from '../Asset'
+import { Asset, Parcel, Estate } from '../Asset'
 import { Contribution } from '../Contribution'
 import { District } from '../District'
-import { Publication } from '../Publication'
+import { Publication, PublicationQueries } from '../Publication'
 import { SQL, raw } from '../database'
 import { asyncBatch } from '../lib'
 import { isDistrict } from '../../shared/district'
@@ -12,6 +12,8 @@ import { TileType } from '../../shared/map'
 import { isEstate } from '../../shared/parcel'
 import { ASSET_TYPES } from '../shared/asset'
 import { PUBLICATION_STATUS } from '../shared/publication'
+
+const propertiesBlacklist = ['district_id', 'asset_type', 'expires_at']
 
 export class Tile extends Model {
   static tableName = 'tiles'
@@ -26,6 +28,7 @@ export class Tile extends Model {
     'name',
     'type',
     'asset_type',
+    'expires_at',
     'is_connected_left',
     'is_connected_top',
     'is_connected_topleft'
@@ -83,15 +86,13 @@ export class Tile extends Model {
   }
 
   static async findFrom(timestamp) {
-    const columnNames = this.filterColumnNames([
-      'district_id',
-      'asset_type'
-    ]).join(', ')
+    const columnNames = this.filterColumnNames(propertiesBlacklist).join(', ')
 
     return this.db.query(SQL`
       SELECT ${raw(columnNames)}
         FROM ${raw(this.tableName)}
-        WHERE updated_at >= ${timestamp}`)
+        WHERE updated_at >= ${timestamp}
+          AND ${PublicationQueries.isActive()}`)
   }
 
   /**
@@ -100,11 +101,11 @@ export class Tile extends Model {
    */
   static async getForOwner(owner, from) {
     const districtColumnNames = this.filterColumnNames(
-      ['price', 'owner', 'estate_id', 'district_id', 'asset_type'],
+      ['owner', 'price', 'estate_id', ...propertiesBlacklist],
       't'
     ).join(', ')
     const ownerColumnNames = this.filterColumnNames(
-      ['owner', 'district_id', 'asset_type'],
+      ['owner', ...propertiesBlacklist],
       't'
     ).join(', ')
 
@@ -118,12 +119,14 @@ export class Tile extends Model {
           JOIN ${raw(Contribution.tableName)} c ON c.address = ${owner} AND c.district_id = t.district_id
           WHERE (t.owner != ${owner} OR t.owner IS NULL)
             AND t.district_id IS NOT NULL
+            AND ${PublicationQueries.isActive()}
             AND ${whereUpdatedAt}
           GROUP BY c.id, ${raw(districtColumnNames)}`),
       this.db.query(SQL`
         SELECT ${raw(ownerColumnNames)}
           FROM ${raw(this.tableName)} t
           WHERE owner = ${owner}
+            AND ${PublicationQueries.isActive()}
             AND ${whereUpdatedAt}`)
     ])
 

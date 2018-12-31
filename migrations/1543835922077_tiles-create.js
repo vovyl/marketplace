@@ -14,6 +14,7 @@ exports.up = pgm => {
       district_id: 'TEXT',
       owner: 'TEXT',
       price: 'DECIMAL',
+      expires_at: 'BIGINT',
       name: 'TEXT',
       type: { type: 'SMALLINT', notNull: true },
       asset_type: { type: 'TEXT', default: ASSET_TYPES.parcel, notNull: true },
@@ -31,6 +32,7 @@ exports.up = pgm => {
   pgm.createIndex(tableName, 'district_id')
   pgm.createIndex(tableName, 'type')
   pgm.createIndex(tableName, 'updated_at')
+  pgm.createIndex(tableName, 'expires_at')
 }
 
 exports.down = pgm => {
