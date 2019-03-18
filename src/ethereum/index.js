@@ -44,7 +44,8 @@ export function loadContracts() {
     },
     LANDRegistry: {
       address: getEnvAddress('LAND_REGISTRY_CONTRACT_ADDRESS'),
-      eventNames: ['Update', 'Transfer', 'UpdateOperator']
+      eventNames: ['Update', 'Transfer', 'UpdateOperator'],
+      types: { Transfer: 2 }
     },
     EstateRegistry: {
       address: getEnvAddress('ESTATE_REGISTRY_CONTRACT_ADDRESS'),
@@ -114,4 +115,14 @@ function getEnvAddress(name) {
     throw new Error(`Could not find env ${name}`)
   }
   return value.toLowerCase()
+}
+
+export function getNumberTypesOfEvents(contractName, eventName) {
+  if (!contractsData[contractName].types) {
+    return 1
+  }
+
+  const types = contractsData[contractName].types
+
+  return types[eventName] || 1
 }
